@@ -8,15 +8,61 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Upcoming
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.sunflower.chaperone.payment.PaymentActivity
+import com.sunflower.chaperone.ui.theme.lightPurple
 import com.sunflower.chaperone.ui.theme.textPurple
 
 @Composable
@@ -63,114 +110,159 @@ fun WalksHomeScreen(
             }
         }
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val pullToRefreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            viewModel.startRefresh()
+            viewModel.setFilter(selectedFilter)
+        },
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                modifier = Modifier.align(Alignment.TopCenter),
+                isRefreshing = isRefreshing,
+                containerColor = lightPurple,
+                color = textPurple,
+                state = pullToRefreshState
+            )
+        },
     ) {
-        // Filter Dropdown
-        FilterDropdown(
-            selectedFilter = selectedFilter,
-            showMenu = showFilterMenu,
-            onToggleMenu = { viewModel.toggleFilterMenu() },
-            onSelectFilter = { viewModel.setFilter(it) }
-        )
 
-        // Content based on state
-        when (val state = uiState) {
-            is WalksUiState.Loading -> {
-                LoadingContent()
-            }
 
-            is WalksUiState.Error -> {
-                if (selectedFilter == WalkFilter.REQUEST_SENT)
-                    ErrorContent(
-                        message = state.message,
-                        onRetry = { viewModel.loadRequestSentWalks() }
-                    )
-                else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(state.message, color = MaterialTheme.colorScheme.error)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = {
-                                if (selectedFilter == WalkFilter.UPCOMING)
-                                    viewModel.loadUpcomingWalks() else viewModel.loadCompletedWalks()
-                            }) {
-                                Text("Retry")
-                            }
-                        }
-                    }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            // Filter Dropdown
+            FilterDropdown(
+                selectedFilter = selectedFilter,
+                showMenu = showFilterMenu,
+                onToggleMenu = { viewModel.toggleFilterMenu() },
+                onSelectFilter = { viewModel.setFilter(it) }
+            )
+
+            // Content based on state
+            when (val state = uiState) {
+                is WalksUiState.Loading -> {
+                    LoadingContent()
                 }
-            }
 
-            is WalksUiState.Success -> {
-                if (selectedFilter == WalkFilter.REQUEST_SENT) {
-                    if (state.requests.isEmpty()) {
-                        EmptyRequestsContent(selectedFilter)
-                    } else {
-
-                        RequestSentList(
-                            requests = state.requests,
-                            withdrawState = withdrawState,
-                            onViewProfile = onNavigateToProfile,
-                            onWithdraw = { viewModel.withdrawRequest(it) },
-                            onPayFees = { requestId ->
-                                viewModel.onPayFee(requestId) { order ->
-
-                                    val intent =
-                                        Intent(context, PaymentActivity::class.java).apply {
-                                            putExtra("id", order.id)
-                                            putExtra("order_id", order.order_id)
-                                            putExtra("key", order.key)
-                                            putExtra("amount", order.amount)
-                                            putExtra("currency", order.currency)
-                                        }
-                                    launcher.launch(intent)
+                is WalksUiState.Error -> {
+                    if (selectedFilter == WalkFilter.REQUEST_SENT)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState()), // 👈 scrollable
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ErrorContent(
+                                message = state.message,
+                                onRetry = { viewModel.loadRequestSentWalks() }
+                            )
+                        }
+                    else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(state.message, color = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = {
+                                    if (selectedFilter == WalkFilter.UPCOMING)
+                                        viewModel.loadUpcomingWalks() else viewModel.loadCompletedWalks()
+                                }) {
+                                    Text("Retry")
                                 }
                             }
-                        )
-
-                    }
-                } else {
-                    if (state.walks.isEmpty()) {
-                        EmptyRequestsContent(selectedFilter)
-                    } else {
-                        LazyColumn {
-                            items(state.walks.size) { index ->
-                                WalkCard(
-                                    walk = state.walks[index],
-                                    isCompleted = selectedFilter == WalkFilter.COMPLETED,
-                                    trackLocation
-                                )
-                            }
                         }
+                    }
+                }
 
+                is WalksUiState.Success -> {
+                    if (selectedFilter == WalkFilter.REQUEST_SENT) {
+                        if (state.requests.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()), // 👈 scrollable
+                                contentAlignment = Alignment.Center
+                            ) {
+                                EmptyRequestsContent(selectedFilter)
+                            }
+                        } else {
+
+                            RequestSentList(
+                                requests = state.requests,
+                                withdrawState = withdrawState,
+                                onViewProfile = onNavigateToProfile,
+                                onWithdraw = { viewModel.withdrawRequest(it) },
+                                onPayFees = { requestId ->
+                                    viewModel.onPayFee(requestId) { order ->
+
+                                        val intent =
+                                            Intent(context, PaymentActivity::class.java).apply {
+                                                putExtra("id", order.id)
+                                                putExtra("order_id", order.order_id)
+                                                putExtra("key", order.key)
+                                                putExtra("amount", order.amount)
+                                                putExtra("currency", order.currency)
+                                            }
+                                        launcher.launch(intent)
+                                    }
+                                }
+                            )
+
+                        }
+                    } else {
+                        if (state.walks.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()), // 👈 scrollable
+                                contentAlignment = Alignment.Center
+                            ) {
+                                EmptyRequestsContent(selectedFilter)
+                            }
+                        } else {
+                            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                items(state.walks.size) { index ->
+                                    WalkCard(
+                                        walk = state.walks[index],
+                                        isCompleted = selectedFilter == WalkFilter.COMPLETED,
+                                        trackLocation
+                                    )
+                                }
+                            }
+
+                        }
                     }
                 }
             }
         }
-    }
 
-    // Withdraw confirmation or success dialog
-    when (val state = withdrawState) {
-        is WithdrawState.Success -> {
-            SuccessDialog(
-                message = "Request withdrawn successfully",
-                onDismiss = { viewModel.resetWithdrawState() }
-            )
+        // Withdraw confirmation or success dialog
+        when (val state = withdrawState) {
+            is WithdrawState.Success -> {
+                SuccessDialog(
+                    message = "Request withdrawn successfully",
+                    onDismiss = { viewModel.resetWithdrawState() }
+                )
+            }
+
+            is WithdrawState.Error -> {
+                ErrorDialog(
+                    message = state.message,
+                    onDismiss = { viewModel.resetWithdrawState() }
+                )
+            }
+
+            else -> Unit
         }
 
-        is WithdrawState.Error -> {
-            ErrorDialog(
-                message = state.message,
-                onDismiss = { viewModel.resetWithdrawState() }
-            )
-        }
-
-        else -> {}
     }
 }
 

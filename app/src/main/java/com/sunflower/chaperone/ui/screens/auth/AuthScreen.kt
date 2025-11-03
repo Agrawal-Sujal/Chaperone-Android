@@ -44,7 +44,7 @@ fun AuthScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val webClientId = "230407577159-t2j39ncri8es7ojdlduutbfdurfh2qfm.apps.googleusercontent.com"
+    val webClientId = "65176085-cvie1gufl6gdhsbsl2pgal2ff5a2n7pu.apps.googleusercontent.com"
 
     // Trigger Google Sign-In automatically when the screen loads
     LaunchedEffect(Unit) {

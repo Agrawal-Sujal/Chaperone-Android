@@ -11,6 +11,7 @@ import com.sunflower.chaperone.services.remote.WalksServices
 import com.sunflower.chaperone.utils.Utils.parseResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +67,8 @@ class WalksHomeScreenViewModel @Inject constructor(
     private val _showFilterMenu = MutableStateFlow(false)
     val showFilterMenu: StateFlow<Boolean> = _showFilterMenu.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val _withdrawState = MutableStateFlow<WithdrawState>(WithdrawState.Idle)
     val withdrawState: StateFlow<WithdrawState> = _withdrawState.asStateFlow()
 
@@ -73,6 +76,12 @@ class WalksHomeScreenViewModel @Inject constructor(
         loadRequestSentWalks()
     }
 
+    fun startRefresh(){
+        _isRefreshing.value = true
+    }
+    fun stopRefresh(){
+        _isRefreshing.value = false
+    }
     fun showError(error: String?) {
         _uiState.value = WalksUiState.Error(
             error ?: "Payment not completed"
@@ -118,6 +127,8 @@ class WalksHomeScreenViewModel @Inject constructor(
                 _uiState.value = WalksUiState.Error(
                     e.message ?: "Failed to load data. Please try again."
                 )
+            }finally {
+                stopRefresh()
             }
         }
     }
@@ -162,6 +173,8 @@ class WalksHomeScreenViewModel @Inject constructor(
                 _uiState.value = WalksUiState.Error(
                     e.message ?: "Failed to load data. Please try again."
                 )
+            }finally {
+                stopRefresh()
             }
         }
     }
@@ -197,6 +210,8 @@ class WalksHomeScreenViewModel @Inject constructor(
                 _uiState.value = WalksUiState.Error(
                     e.message ?: "Failed to load data. Please try again."
                 )
+            }finally {
+                stopRefresh()
             }
 
         }
